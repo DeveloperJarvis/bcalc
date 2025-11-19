@@ -50,14 +50,32 @@ Token get_next_token()
 		return token;
 	}
 
-	if (isdigit(input[pos]))
+	if (isdigit(input[pos]) || input[pos] == '.')
 	{
 		token.type = TOKEN_NUMBER;
 		token.value = 0;
-		while (isdigit(input[pos]))
+		int decimal_point = 0;
+
+		while (isdigit(input[pos]) || (input[pos] == '.' && !decimal_point))
 		{
+			if (input[pos] == '.') 
+			{
+				decimal_point = 1;	// Only one decimal point allowed
+				pos++;
+				continue;
+			}
+			
 			token.value = token.value * 10 + (input[pos] - '0');
+			if (decimal_point)
+			{
+				decimal_point *= 10;
+			}
 			pos++;
+		}
+
+		if (decimal_point)
+		{
+			token.value /= decimal_point;
 		}
 		return token;
 	}
@@ -122,7 +140,8 @@ Token get_next_token()
 
 Token current_token;
 
-void next_token() {
+void next_token()
+{
 	current_token = get_next_token();
 }
 
@@ -132,23 +151,28 @@ double parse_term();
 double parse_factor();
 
 // Factor: Handles numbers and parenthesis
-double parse_factor() {
+double parse_factor()
+{
 	double result = 0;
 
-	if (current_token.type == TOKEN_NUMBER) {
+	if (current_token.type == TOKEN_NUMBER)
+	{
 		result = current_token.value;
-		next_token();	// Move to next token
+		next_token(); // Move to next token
 	}
-	else if (current_token.type == TOKEN_LPAREN) {
-		next_token();	// Consume '('
-		result = parse_expression();	// Parse inside parenthesis
-		if (current_token.type != TOKEN_RPAREN) {
+	else if (current_token.type == TOKEN_LPAREN)
+	{
+		next_token();				 // Consume '('
+		result = parse_expression(); // Parse inside parenthesis
+		if (current_token.type != TOKEN_RPAREN)
+		{
 			fprintf(stderr, "Error: Expected closing parenthesis\n");
 			exit(1);
 		}
-		next_token();	// Consume ')'
+		next_token(); // Consume ')'
 	}
-	else {
+	else
+	{
 		fprintf(stderr, "Error: Unexpected token\n");
 		exit(1);
 	}
@@ -156,28 +180,74 @@ double parse_factor() {
 }
 
 // Term: Handles multiplication and division
-double parse_term() {
+double parse_term()
+{
 	double result = parse_factor();
 
-	while(current_token.type == TOKEN_MULTIPLY || current_token.type == TOKEN_DIVIDE) {
-		if (current_token.type == TOKEN_MULTIPLY) {
-			next_token();	// Consume '*'
+	while (current_token.type == TOKEN_MULTIPLY || current_token.type == TOKEN_DIVIDE)
+	{
+		if (current_token.type == TOKEN_MULTIPLY)
+		{
+			next_token(); // Consume '*'
 			result *= parse_factor();
 		}
-		else if (current_token == TOKEN_DIVIDE) {
-			next_token();	// Consume '/'
+		else if (current_token.type == TOKEN_DIVIDE)
+		{
+			next_token(); // Consume '/'
+			double divisor = parse_factor();
+			if (divisor == 0)
+			{
+				fprintf(stderr, "Error: Division by zero\n");
+				exit(1);
+			}
+			result /= divisor;
 		}
 	}
+	return result;
+}
+
+// Expression: Handles addition and subtraction
+double parse_expression()
+{
+	double result = parse_term();
+
+	while (current_token.type == TOKEN_PLUS || current_token.type == TOKEN_MINUS)
+	{
+		if (current_token.type == TOKEN_PLUS)
+		{
+			next_token(); // Consume '+'
+			result += parse_term();
+		}
+		else if (current_token.type == TOKEN_MINUS)
+		{
+			next_token(); // Consume '-'
+			result -= parse_term();
+		}
+	}
+	return result;
 }
 
 // -----------------------------------
 // Evaluate line
 // -----------------------------------
+// It initializes first token and resets position so that parse_expression() is called
+// -----------------------------------
 
 double eval(const char *line)
 {
-	puts(line);
-	return (double)0.0;
+	input = line;
+	pos = 0;	  // Reset position
+	next_token(); // Initialize first token
+
+	double result = parse_expression();
+
+	if (current_token.type != TOKEN_END)
+	{
+		fprintf(stderr, "Error: Unexpected token after expression\n");
+		exit(1);
+	}
+
+	return result;
 }
 
 // -----------------------------------
